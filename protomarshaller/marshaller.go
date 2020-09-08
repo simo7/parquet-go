@@ -32,14 +32,12 @@ func (m *Marshaller) marshal(record interfaces.MarshalObject, message protorefle
 func (m *Marshaller) decodeMessage(record interfaces.MarshalObject, message protoreflect.Message, schemaDef *parquetschema.SchemaDefinition) error {
 	var err error
 
-	var f = func(fd protoreflect.FieldDescriptor, vl protoreflect.Value) bool {
+	var f = func(fd protoreflect.FieldDescriptor, value protoreflect.Value) bool {
 		fieldName := string(fd.Name())
-
-		subSchemaDef := schemaDef.SubSchema(fieldName)
-
+		schemaDef := schemaDef.SubSchema(fieldName)
 		field := record.AddField(fieldName)
 
-		err = m.decodeValue(field, fd, vl, subSchemaDef)
+		err = m.decodeValue(field, value, schemaDef, fd)
 		if err != nil {
 			return false
 		}
@@ -51,12 +49,14 @@ func (m *Marshaller) decodeMessage(record interfaces.MarshalObject, message prot
 	return err
 }
 
-func (m *Marshaller) decodeValue(field interfaces.MarshalElement, fd protoreflect.FieldDescriptor, value protoreflect.Value, schemaDef *parquetschema.SchemaDefinition) error {
-	if fd.IsList() {
-		if elem := schemaDef.SchemaElement(); elem.GetConvertedType() != parquet.ConvertedType_LIST {
-			return m.decodeMessage(field.Group(), value.Message(), schemaDef)
-		}
-		return m.decodeRepeated(field, fd, value, schemaDef)
+func (m *Marshaller) decodeValue(field interfaces.MarshalElement, value protoreflect.Value, schemaDef *parquetschema.SchemaDefinition, fd protoreflect.FieldDescriptor) error {
+	elem := schemaDef.SchemaElement()
+	if elem == nil {
+		return fmt.Errorf("no schema element present on the schema definition for field: %s", fd.FullName())
+	}
+
+	if fd.IsList() && elem.GetConvertedType() == parquet.ConvertedType_LIST {
+		return m.decodeRepeated(field, value, schemaDef, fd)
 	}
 
 	switch fd.Kind() {
@@ -112,15 +112,21 @@ func (m *Marshaller) decodeByteSliceOrArray(field interfaces.MarshalElement, val
 	return nil
 }
 
-func (m *Marshaller) decodeRepeated(field interfaces.MarshalElement, fd protoreflect.FieldDescriptor, value protoreflect.Value, schemaDef *parquetschema.SchemaDefinition) error {
+func (m *Marshaller) decodeRepeated(field interfaces.MarshalElement, value protoreflect.Value, schemaDef *parquetschema.SchemaDefinition, fd protoreflect.FieldDescriptor) error {
+	if elem := schemaDef.SchemaElement(); elem.GetConvertedType() != parquet.ConvertedType_LIST {
+		return fmt.Errorf("decoding list but schema element %s is not annotated as LIST", elem.GetName())
+	}
+
 	listSchemaDef := schemaDef.SubSchema("list")
-	elementSchemaDef := listSchemaDef.SubSchema("element")
+	elemSchemaDef := listSchemaDef.SubSchema("element")
 
 	list := field.List()
-	l := value.List()
+	values := value.List()
 
-	for i := 0; i < l.Len(); i++ {
-		if err := m.decodeValue(list.Add(), fd, l.Get(i), elementSchemaDef); err != nil {
+	for i := 0; i < values.Len(); i++ {
+		f := list.Add()
+		v := values.Get(i)
+		if err := m.decodeValue(f, v, elemSchemaDef, fd); err != nil {
 			return err
 		}
 	}
