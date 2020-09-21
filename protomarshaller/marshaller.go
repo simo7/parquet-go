@@ -12,8 +12,9 @@ import (
 
 // Marshaller is a custom marshaller for protobuf structs
 type Marshaller struct {
-	Obj       proto.Message
-	SchemaDef *parquetschema.SchemaDefinition
+	Obj          proto.Message
+	SchemaDef    *parquetschema.SchemaDefinition
+	EmitDefaults bool
 }
 
 // MarshalParquet hydrates a MarshalObject record from a protobuf struct
@@ -27,6 +28,17 @@ func (m *Marshaller) marshal(record interfaces.MarshalObject, message protorefle
 	}
 
 	return nil
+}
+
+// range over fields (populated or not) of populated messages.
+func rangeEmitDefaults(m protoreflect.Message, f func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool) {
+	fds := m.Descriptor().Fields()
+	for i := 0; i < fds.Len(); i++ {
+		fd := fds.Get(i)
+		if (m.Has(fd) || fd.Kind().String() != "message") && !f(fd, m.Get(fd)) {
+			return
+		}
+	}
 }
 
 func (m *Marshaller) decodeMessage(record interfaces.MarshalObject, message protoreflect.Message, schemaDef *parquetschema.SchemaDefinition) error {
@@ -44,7 +56,11 @@ func (m *Marshaller) decodeMessage(record interfaces.MarshalObject, message prot
 		return true
 	}
 
-	message.Range(f)
+	if m.EmitDefaults {
+		rangeEmitDefaults(message, f)
+	} else {
+		message.Range(f)
+	}
 
 	return err
 }
