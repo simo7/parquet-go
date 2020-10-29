@@ -12,13 +12,12 @@ import (
 	pb "github.com/fraugster/parquet-go/protomarshaller/proto"
 )
 
-// extension fields
-
 func TestMarshaller_MarshalParquet(t *testing.T) {
 	testData := []struct {
-		EmitDefaults   bool
-		Input          *pb.Person
-		ExpectedOutput map[string]interface{}
+		EmitDefaults        bool
+		UnknownEnumIDPrefix string
+		Input               *pb.Person
+		ExpectedOutput      map[string]interface{}
 	}{
 		{
 			EmitDefaults: false,
@@ -99,7 +98,7 @@ func TestMarshaller_MarshalParquet(t *testing.T) {
 					},
 					{
 						Number: int32(123123),
-						Type:   pb.Person_HOME,
+						Type:   4,
 					},
 				},
 			},
@@ -120,7 +119,47 @@ func TestMarshaller_MarshalParquet(t *testing.T) {
 						{
 							"element": map[string]interface{}{
 								"number": int32(123123),
-								"type":   []byte("HOME"),
+								"type":   []byte("UNKNOWN"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			EmitDefaults:        false,
+			UnknownEnumIDPrefix: "_UNKNOWN_ENUM_ID_",
+			Input: &pb.Person{
+				Phones: []*pb.Person_PhoneNumber{
+					{
+						Number:   int32(123123),
+						Carriers: []string{"carrier1", "carrier2"},
+						Type:     pb.Person_WORK,
+					},
+					{
+						Number: int32(123123),
+						Type:   4,
+					},
+				},
+			},
+			ExpectedOutput: map[string]interface{}{
+				"phones": map[string]interface{}{
+					"list": []map[string]interface{}{
+						{
+							"element": map[string]interface{}{
+								"carriers": map[string]interface{}{
+									"list": []map[string]interface{}{
+										{"element": []byte("carrier1")},
+										{"element": []byte("carrier2")}},
+								},
+								"number": int32(123123),
+								"type":   []byte("WORK"),
+							},
+						},
+						{
+							"element": map[string]interface{}{
+								"number": int32(123123),
+								"type":   []byte("_UNKNOWN_ENUM_ID_4"),
 							},
 						},
 					},
@@ -185,9 +224,10 @@ func TestMarshaller_MarshalParquet(t *testing.T) {
 	for idx, tt := range testData {
 		obj := interfaces.NewMarshallObject(nil)
 		m := &Marshaller{
-			Obj:          tt.Input,
-			SchemaDef:    sd,
-			EmitDefaults: tt.EmitDefaults,
+			Obj:                 tt.Input,
+			SchemaDef:           sd,
+			EmitDefaults:        tt.EmitDefaults,
+			UnknownEnumIDPrefix: tt.UnknownEnumIDPrefix,
 		}
 		err = m.MarshalParquet(obj)
 		assert.NoError(t, err, "%d. could not marshal", idx)

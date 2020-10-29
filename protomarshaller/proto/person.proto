@@ -10,7 +10,7 @@ message Person {
   enum PhoneType {
     UNKNOWN = 0;
     HOME = 1;
-    MOBILE = 2;
+    WORK = 2;
   }
 
   message PhoneNumber {

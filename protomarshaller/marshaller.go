@@ -12,9 +12,15 @@ import (
 
 // Marshaller is a custom marshaller for protobuf structs
 type Marshaller struct {
-	Obj          proto.Message
-	SchemaDef    *parquetschema.SchemaDefinition
+	Obj       proto.Message
+	SchemaDef *parquetschema.SchemaDefinition
+	// EmitDefaults sets default values for unpopulated fields of populated messages.
+	// Default is false.
 	EmitDefaults bool
+	// UnknownEnumIDPrefix forms the field's value by prefixing the enum ID when
+	// this is unknown. Eg. "_UNKNOWN_ENUM_ID_" + "32".
+	// When not set the the value will correspond to the 0 ID.
+	UnknownEnumIDPrefix string
 }
 
 // MarshalParquet hydrates a MarshalObject record from a protobuf struct
@@ -28,17 +34,6 @@ func (m *Marshaller) marshal(record interfaces.MarshalObject, message protorefle
 	}
 
 	return nil
-}
-
-// range over fields (populated or not) of populated messages.
-func rangeEmitDefaults(m protoreflect.Message, f func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool) {
-	fds := m.Descriptor().Fields()
-	for i := 0; i < fds.Len(); i++ {
-		fd := fds.Get(i)
-		if (m.Has(fd) || fd.Kind().String() != "message") && !f(fd, m.Get(fd)) {
-			return
-		}
-	}
 }
 
 func (m *Marshaller) decodeMessage(record interfaces.MarshalObject, message protoreflect.Message, schemaDef *parquetschema.SchemaDefinition) error {
@@ -63,6 +58,17 @@ func (m *Marshaller) decodeMessage(record interfaces.MarshalObject, message prot
 	}
 
 	return err
+}
+
+// range over fields (populated or not) of populated messages.
+func rangeEmitDefaults(m protoreflect.Message, f func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool) {
+	fds := m.Descriptor().Fields()
+	for i := 0; i < fds.Len(); i++ {
+		fd := fds.Get(i)
+		if (m.Has(fd) || fd.Kind().String() != "message") && !f(fd, m.Get(fd)) {
+			return
+		}
+	}
 }
 
 func (m *Marshaller) decodeValue(field interfaces.MarshalElement, value protoreflect.Value, schemaDef *parquetschema.SchemaDefinition, fd protoreflect.FieldDescriptor) error {
@@ -99,8 +105,23 @@ func (m *Marshaller) decodeValue(field interfaces.MarshalElement, value protoref
 		return nil
 	case protoreflect.EnumKind:
 		enumNumber := value.Enum()
-		enumName := fd.Enum().Values().ByNumber(enumNumber).Name()
-		field.SetByteArray([]byte(string(enumName)))
+		enumValue := fd.Enum().Values().ByNumber(enumNumber)
+
+		var enumName string
+		if enumValue != nil {
+			enumName = string(enumValue.Name())
+			field.SetByteArray([]byte(enumName))
+			return nil
+		}
+		if m.UnknownEnumIDPrefix == "" {
+			enumValue = fd.Enum().Values().ByNumber(0)
+			enumName = string(enumValue.Name())
+		}
+		if m.UnknownEnumIDPrefix != "" {
+			enumName = fmt.Sprintf("%s%d", m.UnknownEnumIDPrefix, enumNumber)
+		}
+
+		field.SetByteArray([]byte(enumName))
 		return nil
 	case protoreflect.StringKind:
 		field.SetByteArray([]byte(value.String()))
