@@ -2,10 +2,12 @@ package protomarshaller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/fraugster/parquet-go/floor/interfaces"
 	"github.com/fraugster/parquet-go/parquet"
 	"github.com/fraugster/parquet-go/parquetschema"
+	parquetOpts "github.com/simo7/protoc-gen-parquet/parquet_options"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -129,6 +131,16 @@ func (m *Marshaller) decodeValue(field interfaces.MarshalElement, value protoref
 	case protoreflect.BytesKind:
 		return m.decodeByteSliceOrArray(field, value, schemaDef)
 	case protoreflect.MessageKind, protoreflect.GroupKind:
+
+		if value.Message().Type().Descriptor().FullName() == "google.protobuf.Timestamp" {
+			unixtime, err := m.decodeTimestamp(fd, value)
+			if err != nil {
+				return err
+			}
+			field.SetInt64(unixtime)
+			return nil
+		}
+
 		return m.decodeMessage(field.Group(), value.Message(), schemaDef)
 	default:
 		return fmt.Errorf("unsupported type %s", fd.Kind())
@@ -169,4 +181,29 @@ func (m *Marshaller) decodeRepeated(field interfaces.MarshalElement, value proto
 	}
 
 	return nil
+}
+
+func (m *Marshaller) decodeTimestamp(fd protoreflect.FieldDescriptor, value protoreflect.Value) (int64, error) {
+	secDesc := value.Message().Descriptor().Fields().ByName("seconds")
+	secs := value.Message().Get(secDesc)
+	nanoDesc := value.Message().Descriptor().Fields().ByName("nanos")
+	nanos := value.Message().Get(nanoDesc)
+
+	optVal := proto.GetExtension(fd.Options(), parquetOpts.E_FieldOpts)
+	if optVal == nil {
+		return time.Unix(secs.Int(), nanos.Int()).UTC().UnixNano(), nil
+	}
+
+	timestampType := optVal.(*parquetOpts.FieldOptions).GetTimestampType()
+
+	switch timestampType {
+	case parquetOpts.TimestampType_TIMESTAMP_MILLIS:
+		return time.Unix(secs.Int(), nanos.Int()).UTC().UnixNano() / int64(time.Millisecond), nil
+	case parquetOpts.TimestampType_TIMESTAMP_MICROS:
+		return time.Unix(secs.Int(), nanos.Int()).UTC().UnixNano() / int64(time.Microsecond), nil
+	case parquetOpts.TimestampType_TIMESTAMP_NANOS:
+		return time.Unix(secs.Int(), nanos.Int()).UTC().UnixNano(), nil
+	default:
+		return 0, fmt.Errorf("unknown timestamp type: %s", timestampType.String())
+	}
 }
