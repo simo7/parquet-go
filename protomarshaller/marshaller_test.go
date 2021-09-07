@@ -1,15 +1,15 @@
 package protomarshaller
 
 import (
-	"io/ioutil"
 	"testing"
 
 	"github.com/fraugster/parquet-go/floor/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/fraugster/parquet-go/parquetschema"
-	pb "github.com/fraugster/parquet-go/protomarshaller/proto"
+	pb "github.com/simo7/protoc-gen-parquet/examples"
 )
 
 func TestMarshaller_MarshalParquet(t *testing.T) {
@@ -30,16 +30,21 @@ func TestMarshaller_MarshalParquet(t *testing.T) {
 		{
 			EmitDefaults: true,
 			Input: &pb.Person{
-				Name: "name",
-				Age:  18,
+				Name:        "name",
+				Age:         18,
+				CreatedAt:   1587479323999999999,
+				UpdatedAt:   &timestamppb.Timestamp{Seconds: 1587479323, Nanos: 999999999},
+				GeneratedAt: &timestamppb.Timestamp{Seconds: 1587479323, Nanos: 999999999},
 			},
 			ExpectedOutput: map[string]interface{}{
 				"addresses": map[string]interface{}{
 					"list": []map[string]interface{}{},
 				},
-				"age":             int32(18),
-				"entry_timestamp": int64(0),
-				"name":            []byte("name"),
+				"age":          int32(18),
+				"created_at":   int64(1587479323999999999),
+				"updated_at":   int64(1587479323999),
+				"generated_at": int64(1587479323999999),
+				"name":         []byte("name"),
 			},
 		},
 		{
@@ -82,9 +87,10 @@ func TestMarshaller_MarshalParquet(t *testing.T) {
 						},
 					},
 				},
-				"age":             int32(0),
-				"entry_timestamp": int64(0),
-				"name":            []byte(""),
+				"age":        int32(0),
+				"created_at": int64(0),
+				// "update_at":       int64(0),
+				"name": []byte(""),
 			},
 		},
 		{
@@ -209,16 +215,15 @@ func TestMarshaller_MarshalParquet(t *testing.T) {
 				"addresses": map[string]interface{}{
 					"list": []map[string]interface{}{},
 				},
-				"age":             int32(0),
-				"entry_timestamp": int64(0),
-				"name":            []byte(""),
+				"age":        int32(0),
+				"created_at": int64(0),
+				// "update_at":       int64(0),
+				"name": []byte(""),
 			},
 		},
 	}
 
-	b, err := ioutil.ReadFile("proto/person.schema")
-	require.NoError(t, err, "the parquet schema file could not be read")
-	sd, err := parquetschema.ParseSchemaDefinition(string(b))
+	sd, err := parquetschema.ParseSchemaDefinition(pb.ParquetSchema)
 	require.NoError(t, err, "parsing schema failed")
 
 	for idx, tt := range testData {
