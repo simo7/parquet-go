@@ -53,8 +53,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
-github.com/simo7/protoc-gen-parquet v0.3.0 h1:tImNyGdh1kJngvjxojSoLJitzxNM/xpydWJaEZ5cZ1U=
-github.com/simo7/protoc-gen-parquet v0.3.0/go.mod h1:YMgFtEEZCV5QdKzgBHJWXpi35hCcJvute/NguMGSzTE=
+github.com/simo7/protoc-gen-parquet v0.4.0 h1:dKUObN9LPEdftWcgbBFr8BSlq1UVQoq1UpgeWmIoGYM=
+github.com/simo7/protoc-gen-parquet v0.4.0/go.mod h1:YMgFtEEZCV5QdKzgBHJWXpi35hCcJvute/NguMGSzTE=
 github.com/spf13/afero v1.1.2/go.mod h1:j4pytiNVoe2o6bmDsKpLACNPDBIoEAkihy7loJ1B0CQ=
 github.com/spf13/cast v1.3.0/go.mod h1:Qx5cxh0v+4UWYiBimWS+eyWzqEqokIECu5etghLkUJE=
 github.com/spf13/cobra v0.0.5 h1:f0B+LkLX6DtmRH1isoNA9VTtNUK9K8xYd28JNNfOv/s=
